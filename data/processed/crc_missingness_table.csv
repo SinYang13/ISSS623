@@ -1,0 +1,20 @@
+Variable,Clean variable,Role,Domain,Analytic denominator,Unusable N,Unusable percent,Missingness type,Primary decision
+RENTHOM1,housing_tenure,Auxiliary,Sensitivity analysis,227647,1535,0.6742895799197881,Don't know/refused/derived blank,Retain as Not reported; model-time imputation only as sensitivity analysis
+_CRCREC3,crc_noncompliant,Outcome,Outcome,457670,230023,50.259575676797695,Structural: outside eligibility or incomplete calculated screening status,Exclude from analytic cohort; never impute
+_INCOMG1,income_group,Predictor,Demographic and socioeconomic,227647,34001,14.935843652672778,Don't know/refused/derived blank,Retain as Not reported; model-time imputation only as sensitivity analysis
+_BMI5CAT,bmi_category,Predictor,Health status,227647,13268,5.828321919463028,Don't know/refused/derived blank,Retain as Not reported; model-time imputation only as sensitivity analysis
+_URBSTAT,urban_rural,Predictor,Demographic and socioeconomic,227647,7745,3.40219726154968,Don't know/refused/derived blank,Retain as Not reported; model-time imputation only as sensitivity analysis
+_HLTHPL2,insurance_status,Predictor,Healthcare access,227647,6329,2.780181596946149,Don't know/refused/derived blank,Retain as Not reported; model-time imputation only as sensitivity analysis
+_AGEG5YR,age_group,Predictor,Demographic and socioeconomic,227647,5434,2.3870290405759795,Don't know/refused/derived blank,Retain as Not reported; model-time imputation only as sensitivity analysis
+_RACEGR3,race_ethnicity,Predictor,Demographic and socioeconomic,227647,4217,1.852429419232408,Don't know/refused/derived blank,Retain as Not reported; model-time imputation only as sensitivity analysis
+_SMOKER3,smoking_status,Predictor,Health status,227647,2858,1.255452520788765,Don't know/refused/derived blank,Retain as Not reported; model-time imputation only as sensitivity analysis
+_MICHD,heart_disease,Predictor,Health status,227647,2158,0.9479589012813698,Don't know/refused/derived blank,Retain as Not reported; model-time imputation only as sensitivity analysis
+EMPLOY1,employment_status,Predictor,Demographic and socioeconomic,227647,1875,0.823643623680523,Don't know/refused/derived blank,Retain as Not reported; model-time imputation only as sensitivity analysis
+MARITAL,marital_status,Predictor,Demographic and socioeconomic,227647,1693,0.7436952826086002,Don't know/refused/derived blank,Retain as Not reported; model-time imputation only as sensitivity analysis
+CHECKUP1,checkup_recency,Predictor,Healthcare access,227647,1601,0.7032818354733424,Don't know/refused/derived blank,Retain as Not reported; model-time imputation only as sensitivity analysis
+PERSDOC3,personal_doctor,Predictor,Healthcare access,227647,1581,0.6944963034874169,Don't know/refused/derived blank,Retain as Not reported; model-time imputation only as sensitivity analysis
+_EDUCAG,education_level,Predictor,Demographic and socioeconomic,227647,868,0.3812920881891701,Don't know/refused/derived blank,Retain as Not reported; model-time imputation only as sensitivity analysis
+MEDCOST1,cost_barrier,Predictor,Healthcare access,227647,666,0.29255821513132174,Don't know/refused/derived blank,Retain as Not reported; model-time imputation only as sensitivity analysis
+GENHLTH,general_health,Predictor,Health status,227647,504,0.22139540604532454,Don't know/refused/derived blank,Retain as Not reported; model-time imputation only as sensitivity analysis
+DIABETE4,diabetes_status,Predictor,Health status,227647,357,0.15682174594877157,Don't know/refused/derived blank,Retain as Not reported; model-time imputation only as sensitivity analysis
+SEXVAR,sex,Predictor,Demographic and socioeconomic,227647,0,0.0,Don't know/refused/derived blank,Retain as Not reported; model-time imputation only as sensitivity analysis

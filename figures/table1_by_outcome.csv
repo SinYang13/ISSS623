@@ -1,0 +1,88 @@
+Variable,Category,N,Compliant %,Non-compliant %
+age_group,45-49,26594,44.1,55.9
+age_group,50-54,29152,62.6,37.4
+age_group,55-59,32326,74.9,25.1
+age_group,60-64,40134,78.1,21.9
+age_group,65-69,44332,82.6,17.4
+age_group,70-74,41607,84.7,15.3
+age_group,75 (source category 75-79),8068,84.3,15.7
+age_group,Not reported,5434,59.1,40.9
+sex,Female,120889,74.7,25.3
+sex,Male,106758,72.1,27.9
+race_ethnicity,"Black only, non-Hispanic",17272,74.1,25.9
+race_ethnicity,Hispanic,17405,59.1,40.9
+race_ethnicity,"Multiracial, non-Hispanic",4443,67.8,32.2
+race_ethnicity,Not reported,4217,62.7,37.3
+race_ethnicity,"Other race only, non-Hispanic",10158,62.0,38.0
+race_ethnicity,"White only, non-Hispanic",174152,76.0,24.0
+education_level,Attended college or technical school,62575,73.6,26.4
+education_level,Did not graduate high school,12196,55.9,44.1
+education_level,Graduated college or technical school,99322,78.5,21.5
+education_level,Graduated high school,52686,68.6,31.4
+education_level,Not reported,868,52.6,47.4
+income_group,"$100,000 to < $200,000",45753,77.0,23.0
+income_group,"$15,000 to < $25,000",17221,66.5,33.5
+income_group,"$200,000 or more",17118,79.2,20.8
+income_group,"$25,000 to < $35,000",19923,69.0,31.0
+income_group,"$35,000 to < $50,000",23510,71.8,28.2
+income_group,"$50,000 to < $100,000",58801,76.7,23.3
+income_group,"Less than $15,000",11320,61.1,38.9
+income_group,Not reported,34001,72.0,28.0
+employment_status,Employed for wages,86841,68.8,31.2
+employment_status,Homemaker,7219,63.2,36.8
+employment_status,Not reported,1875,59.9,40.1
+employment_status,Out of work for 1 year or more,4371,59.2,40.8
+employment_status,Out of work for less than 1 year,3944,59.1,40.9
+employment_status,Retired,81156,84.5,15.5
+employment_status,Self-employed,22200,66.0,34.0
+employment_status,Student,540,50.0,50.0
+employment_status,Unable to work,19501,69.5,30.5
+marital_status,Divorced,38951,69.7,30.3
+marital_status,Married,133372,77.2,22.8
+marital_status,Member of an unmarried couple,6314,64.5,35.5
+marital_status,Never married,22667,62.5,37.5
+marital_status,Not reported,1693,59.2,40.8
+marital_status,Separated,5011,58.9,41.1
+marital_status,Widowed,19639,76.6,23.4
+urban_rural,Not reported,7745,70.0,30.0
+urban_rural,Rural,32930,70.8,29.2
+urban_rural,Urban,186972,74.2,25.8
+insurance_status,Insured,212908,75.5,24.5
+insurance_status,Not reported,6329,64.3,35.7
+insurance_status,Uninsured,8410,30.0,70.0
+personal_doctor,Has personal doctor,209315,76.8,23.2
+personal_doctor,No personal doctor,16751,33.8,66.2
+personal_doctor,Not reported,1581,58.3,41.7
+cost_barrier,No,209512,75.3,24.7
+cost_barrier,Not reported,666,52.4,47.6
+cost_barrier,Yes,17469,53.3,46.7
+checkup_recency,1 to < 2 years,15948,58.2,41.8
+checkup_recency,2 to < 5 years,7101,37.4,62.6
+checkup_recency,5 or more years,6926,17.1,82.9
+checkup_recency,Never,799,20.7,79.3
+checkup_recency,Not reported,1601,47.6,52.4
+checkup_recency,Within past year,195272,78.5,21.5
+general_health,Excellent,29548,71.5,28.5
+general_health,Fair,35691,71.1,28.9
+general_health,Good,76241,73.5,26.5
+general_health,Not reported,504,55.0,45.0
+general_health,Poor,12838,69.7,30.3
+general_health,Very good,72825,76.3,23.7
+diabetes_status,Diabetes,42007,77.8,22.2
+diabetes_status,Diabetes during pregnancy only,1388,66.5,33.5
+diabetes_status,No diabetes,176988,72.5,27.5
+diabetes_status,Not reported,357,64.1,35.9
+diabetes_status,Prediabetes or borderline diabetes,6907,75.2,24.8
+heart_disease,CHD or MI not reported,201880,73.0,27.0
+heart_disease,CHD or MI reported,23609,78.5,21.5
+heart_disease,Not reported,2158,68.1,31.9
+smoking_status,Current smoker - every day,21546,60.2,39.8
+smoking_status,Current smoker - some days,7513,62.7,37.3
+smoking_status,Former smoker,67777,76.5,23.5
+smoking_status,Never smoked,127953,74.9,25.1
+smoking_status,Not reported,2858,71.0,29.0
+bmi_category,Normal weight,53504,72.4,27.6
+bmi_category,Not reported,13268,67.5,32.5
+bmi_category,Obese,80068,74.2,25.8
+bmi_category,Overweight,78036,74.8,25.2
+bmi_category,Underweight,2771,68.0,32.0

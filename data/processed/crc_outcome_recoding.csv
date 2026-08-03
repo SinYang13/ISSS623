@@ -1,0 +1,5 @@
+_CRCREC3,Original meaning,Primary binary outcome,Secondary descriptive status
+1,At least one recommended CRC test within interval,0 = Compliant,Up to date
+2,Previously screened but not within interval,1 = Non-compliant,Overdue
+3,Never had a recommended CRC test,1 = Non-compliant,Never screened
+,Missing or outside the eligible age definition,Excluded,Not in analytic cohort

@@ -1,0 +1,19 @@
+Source variable,Clean variable,Domain,Concept,Source missing codes,Equity subgroup field,Role,Primary missing decision
+_CRCREC3,crc_noncompliant,Outcome,CRC screening non-compliance,Blank / ineligible,False,Outcome,Exclude blank/ineligible; do not impute
+_AGEG5YR,age_group,Demographic and socioeconomic,Five-year age bands,14 or blank,True,Predictor,Retain as Not reported
+SEXVAR,sex,Demographic and socioeconomic,Sex of respondent,None expected,True,Predictor,Retain as Not reported
+_RACEGR3,race_ethnicity,Demographic and socioeconomic,Five-level race/ethnicity,9,True,Predictor,Retain as Not reported
+_EDUCAG,education_level,Demographic and socioeconomic,Education category,9,False,Predictor,Retain as Not reported
+_INCOMG1,income_group,Demographic and socioeconomic,Household income category,9,True,Predictor,Retain as Not reported
+EMPLOY1,employment_status,Demographic and socioeconomic,Employment status,9 or blank,False,Predictor,Retain as Not reported
+MARITAL,marital_status,Demographic and socioeconomic,Marital status,9 or blank,False,Predictor,Retain as Not reported
+_URBSTAT,urban_rural,Demographic and socioeconomic,Urban/rural status,Blank,False,Predictor,Retain as Not reported
+_HLTHPL2,insurance_status,Healthcare access,Any health insurance,9,True,Predictor,Retain as Not reported
+PERSDOC3,personal_doctor,Healthcare access,Has a personal healthcare provider,"7, 9 or blank",False,Predictor,Retain as Not reported
+MEDCOST1,cost_barrier,Healthcare access,Could not afford doctor in past 12 months,"7, 9 or blank",False,Predictor,Retain as Not reported
+CHECKUP1,checkup_recency,Healthcare access,Time since routine check-up,7 or 9,False,Predictor,Retain as Not reported
+GENHLTH,general_health,Health status,Self-rated general health,"7, 9 or blank",False,Predictor,Retain as Not reported
+DIABETE4,diabetes_status,Health status,Diabetes status,7 or 9,False,Predictor,Retain as Not reported
+_MICHD,heart_disease,Health status,Ever reported CHD or MI,Blank,False,Predictor,Retain as Not reported
+_SMOKER3,smoking_status,Health status,Calculated smoking status,9,False,Predictor,Retain as Not reported
+_BMI5CAT,bmi_category,Health status,Calculated BMI category,Blank,False,Predictor,Retain as Not reported

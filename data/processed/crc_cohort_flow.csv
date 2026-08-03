@@ -1,0 +1,4 @@
+Step,Cohort definition,Excluded N,Remaining N
+1,All BRFSS 2024 respondents,0,457670
+2,Exclude blank _CRCREC3: outside age 45-75 or incomplete calculated screening status,230023,227647
+3,Final eligible analytic cohort,0,227647
