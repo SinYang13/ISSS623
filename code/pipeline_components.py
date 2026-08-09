@@ -10,7 +10,7 @@ import numpy as np
 import pandas as pd
 from sklearn.base import BaseEstimator, TransformerMixin
 from sklearn.compose import ColumnTransformer
-from sklearn.ensemble import HistGradientBoostingClassifier
+from sklearn.ensemble import HistGradientBoostingClassifier, RandomForestClassifier
 from sklearn.linear_model import LogisticRegression
 from sklearn.pipeline import Pipeline
 from sklearn.preprocessing import OneHotEncoder, OrdinalEncoder, StandardScaler
@@ -104,5 +104,29 @@ def build_gb_pipeline(features):
         ("preprocess", pre),
         ("model", HistGradientBoostingClassifier(
             categorical_features=[True] * len(features), random_state=RANDOM_SEED,
+        )),
+    ])
+
+
+def build_rf_pipeline(features, n_estimators=300, min_samples_leaf=20):
+    """Random Forest shares gradient boosting's encoding, not logistic regression's: no native
+    categorical support in sklearn's RandomForestClassifier, but tree ensembles can still split
+    usefully on label/ordinal-encoded integers even without one-hot -- unlike a linear model,
+    a tree doesn't assume the encoded values are on a meaningful numeric scale.
+
+    min_samples_leaf=20 (not the sklearn default of 1) is a deliberate, non-searched choice, not
+    hyperparameter tuning: unconstrained trees on this data overfit badly (test AUROC ~0.71-0.72
+    at min_samples_leaf=1 vs ~0.76 at 20), so this is closer to "avoid a setting known to overfit"
+    than a tuned value. Real tuning is still deferred to a cross-validated search, per the
+    calibration-vs-validation note in notebook 3.
+    """
+    pre = ColumnTransformer([
+        ("cat", OrdinalEncoder(handle_unknown="use_encoded_value", unknown_value=-1), features),
+    ])
+    return Pipeline([
+        ("preprocess", pre),
+        ("model", RandomForestClassifier(
+            n_estimators=n_estimators, min_samples_leaf=min_samples_leaf,
+            random_state=RANDOM_SEED, n_jobs=-1,
         )),
     ])
