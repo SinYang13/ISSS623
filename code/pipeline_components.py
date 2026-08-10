@@ -12,6 +12,7 @@ from sklearn.base import BaseEstimator, TransformerMixin
 from sklearn.compose import ColumnTransformer
 from sklearn.ensemble import HistGradientBoostingClassifier, RandomForestClassifier
 from sklearn.linear_model import LogisticRegression
+from sklearn.neural_network import MLPClassifier
 from sklearn.pipeline import Pipeline
 from sklearn.preprocessing import OneHotEncoder, OrdinalEncoder, StandardScaler
 
@@ -128,5 +129,39 @@ def build_rf_pipeline(features, n_estimators=300, min_samples_leaf=20):
         ("model", RandomForestClassifier(
             n_estimators=n_estimators, min_samples_leaf=min_samples_leaf,
             random_state=RANDOM_SEED, n_jobs=-1,
+        )),
+    ])
+
+
+def build_ffnn_pipeline(features, hidden_layer_sizes=(64, 32), alpha=1e-4,
+                         learning_rate_init=1e-3, max_iter=300):
+    """Feedforward neural network (sklearn's `MLPClassifier`). Shares logistic regression's
+    encoding, not the tree models': a network's input layer has no notion that an ordinal-encoded
+    integer or a one-hot indicator should be split on a threshold the way a tree can, so nominal
+    features are one-hot encoded (not label/ordinal-encoded) and every input is scaled -- an
+    unscaled mix of 0/1 indicators and larger-range ranks would let large-scale features dominate
+    the first layer's weights for reasons that have nothing to do with predictive relevance.
+
+    `sample_weight` is supported by `MLPClassifier.fit` (verified directly against the installed
+    sklearn version, since this has not always been true across releases), so class weighting
+    stays consistent with the other three models -- no oversampling needed here either.
+
+    `early_stopping=True` holds out 10% of the training fold internally to decide when to stop,
+    which is a within-training-fold mechanism (distinct from, and unrelated to, the
+    calibration/test splits) -- a standard way to avoid a fixed `max_iter` either under- or
+    over-training the network.
+    """
+    pre = ColumnTransformer([
+        ("ordinal", OrdinalRankWithMissingFlag(
+            {c: ORDINAL_CATEGORY_ORDER[c] for c in ordinal_subset(features)}
+        ), ordinal_subset(features)),
+        ("nominal", OneHotEncoder(handle_unknown="ignore"), nominal_subset(features)),
+    ])
+    return Pipeline([
+        ("preprocess", pre),
+        ("scale", StandardScaler(with_mean=False)),
+        ("model", MLPClassifier(
+            hidden_layer_sizes=hidden_layer_sizes, alpha=alpha, learning_rate_init=learning_rate_init,
+            max_iter=max_iter, early_stopping=True, random_state=RANDOM_SEED,
         )),
     ])
