@@ -169,8 +169,12 @@ def build_ffnn_pipeline(features, hidden_layer_sizes=(64, 32), alpha=1e-4,
 
 
 def compute_classification_metrics(y_true, y_proba, threshold=0.5):
-    """AUROC/AUPRC/Precision/Sensitivity/F1/Accuracy at the given threshold -- the standard set
-    reported for every model (and every hyperparameter-search comparison) in notebooks 4a-4d."""
+    """AUROC/AUPRC/Precision/Sensitivity/Specificity/F1/Accuracy at the given threshold -- the
+    standard set reported for every model (and every hyperparameter-search comparison) in
+    notebooks 4a-4d. Specificity (recall of the negative class) is the one metric the proposal
+    names explicitly (evaluation step e) that isn't otherwise derivable from the rest of this
+    dict, which is why it's included alongside sensitivity rather than left for the caller to
+    compute separately."""
     from sklearn.metrics import (
         roc_auc_score, average_precision_score, precision_score, recall_score, f1_score, accuracy_score,
     )
@@ -180,6 +184,7 @@ def compute_classification_metrics(y_true, y_proba, threshold=0.5):
         "AUPRC": average_precision_score(y_true, y_proba),
         "Precision": precision_score(y_true, y_pred),
         "Sensitivity": recall_score(y_true, y_pred),
+        "Specificity": recall_score(y_true, y_pred, pos_label=0),
         "F1": f1_score(y_true, y_pred),
         "Accuracy": accuracy_score(y_true, y_pred),
     }
