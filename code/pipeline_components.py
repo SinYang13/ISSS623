@@ -142,9 +142,10 @@ def build_ffnn_pipeline(features, hidden_layer_sizes=(64, 32), alpha=1e-4,
     unscaled mix of 0/1 indicators and larger-range ranks would let large-scale features dominate
     the first layer's weights for reasons that have nothing to do with predictive relevance.
 
-    `sample_weight` is supported by `MLPClassifier.fit` (verified directly against the installed
-    sklearn version, since this has not always been true across releases), so class weighting
-    stays consistent with the other three models -- no oversampling needed here either.
+    `sample_weight` support in `MLPClassifier.fit` is not guaranteed across sklearn versions, so
+    this is worth confirming against the installed version rather than assuming -- if unsupported,
+    class weighting would need an alternative (e.g. weighted resampling) to stay consistent with
+    the other three models, which use `sample_weight` rather than oversampling.
 
     `early_stopping=True` holds out 10% of the training fold internally to decide when to stop,
     which is a within-training-fold mechanism (distinct from, and unrelated to, the
@@ -165,3 +166,84 @@ def build_ffnn_pipeline(features, hidden_layer_sizes=(64, 32), alpha=1e-4,
             max_iter=max_iter, early_stopping=True, random_state=RANDOM_SEED,
         )),
     ])
+
+
+def compute_classification_metrics(y_true, y_proba, threshold=0.5):
+    """AUROC/AUPRC/Precision/Sensitivity/F1/Accuracy at the given threshold -- the standard set
+    reported for every model (and every hyperparameter-search comparison) in notebooks 4a-4d."""
+    from sklearn.metrics import (
+        roc_auc_score, average_precision_score, precision_score, recall_score, f1_score, accuracy_score,
+    )
+    y_pred = (y_proba >= threshold).astype(int)
+    return {
+        "AUROC": roc_auc_score(y_true, y_proba),
+        "AUPRC": average_precision_score(y_true, y_proba),
+        "Precision": precision_score(y_true, y_pred),
+        "Sensitivity": recall_score(y_true, y_pred),
+        "F1": f1_score(y_true, y_pred),
+        "Accuracy": accuracy_score(y_true, y_pred),
+    }
+
+
+def make_model_registry(models_dir, manifest_path):
+    """Sets up a model registry bound to the given paths: a `MODEL_REGISTRY` dict plus
+    `register_model`/`load_registry` functions. Notebooks 4a-4d each call this with the same
+    models_dir/manifest_path, so all four register into one shared manifest despite each running
+    in its own kernel with its own empty registry. `register_model` merges into whatever is
+    already on the manifest (keyed by model name) rather than overwriting it, so one notebook
+    running (or re-running) never erases another's rows. `load_registry` reloads every model
+    listed in the manifest without refitting -- used by notebook 5 (Evaluation) to compare across
+    everything 4a-4d have registered.
+    """
+    import joblib
+
+    models_dir.mkdir(parents=True, exist_ok=True)
+    registry = {}
+
+    def _write_manifest():
+        existing = {}
+        if manifest_path.exists():
+            existing = pd.read_csv(manifest_path).set_index("name").to_dict("index")
+        for name, entry in registry.items():
+            row = {
+                "model_type": entry["model_type"],
+                "n_features": len(entry["features"]),
+                "path": entry["path"],
+                "notes": entry["notes"],
+            }
+            row.update(entry["metrics"])
+            existing[name] = row
+        rows = [{"name": name, **row} for name, row in existing.items()]
+        pd.DataFrame(rows).to_csv(manifest_path, index=False)
+
+    def register_model(name, pipeline, metrics, features, model_type, notes=""):
+        path = models_dir / f"{name}.joblib"
+        joblib.dump(pipeline, path)
+        registry[name] = {
+            "pipeline": pipeline,
+            "metrics": metrics,
+            "features": features,
+            "model_type": model_type,
+            "path": str(path),
+            "notes": notes,
+        }
+        _write_manifest()
+        return registry[name]
+
+    def load_registry():
+        if not manifest_path.exists():
+            return {}
+        manifest = pd.read_csv(manifest_path)
+        out = {}
+        for _, row in manifest.iterrows():
+            out[row["name"]] = {
+                "pipeline": joblib.load(row["path"]),
+                "metrics": {k: row[k] for k in ["AUROC", "AUPRC", "Precision", "Sensitivity", "F1", "Accuracy"]},
+                "n_features": int(row["n_features"]),
+                "model_type": row["model_type"],
+                "path": row["path"],
+                "notes": row["notes"],
+            }
+        return out
+
+    return registry, register_model, load_registry
