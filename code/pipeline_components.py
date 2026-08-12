@@ -239,11 +239,17 @@ def make_model_registry(models_dir, manifest_path):
         if not manifest_path.exists():
             return {}
         manifest = pd.read_csv(manifest_path)
+        # Read back whatever metric columns are actually on the manifest, rather than a hardcoded
+        # list -- a hardcoded list silently drops any metric added after the list was written
+        # (this dropped "Specificity" for a while after it was added to compute_classification_metrics,
+        # since the manifest gained the column but this function didn't know to read it back).
+        non_metric_cols = {"name", "model_type", "n_features", "path", "notes"}
+        metric_cols = [c for c in manifest.columns if c not in non_metric_cols]
         out = {}
         for _, row in manifest.iterrows():
             out[row["name"]] = {
                 "pipeline": joblib.load(row["path"]),
-                "metrics": {k: row[k] for k in ["AUROC", "AUPRC", "Precision", "Sensitivity", "F1", "Accuracy"]},
+                "metrics": {k: row[k] for k in metric_cols},
                 "n_features": int(row["n_features"]),
                 "model_type": row["model_type"],
                 "path": row["path"],
@@ -252,3 +258,65 @@ def make_model_registry(models_dir, manifest_path):
         return out
 
     return registry, register_model, load_registry
+
+
+def load_prediction_context(model_dir, analytic_path, model_name="gb_M3_tuned_calibrated"):
+    """Loads everything `predict_respondents` needs: the named model from the shared manifest,
+    the calibrated test-set risk distribution (for placing a new prediction's percentile/decile
+    in context), and the live set of valid category values per M3 predictor. Shared by
+    `9 Predict.ipynb` and `app.py` (the Streamlit webapp) so both stay in sync with one source of
+    truth rather than duplicating this logic."""
+    import joblib
+
+    manifest_path = model_dir / "model_registry_manifest.csv"
+    manifest = pd.read_csv(manifest_path)
+    model_row = manifest.set_index("name").loc[model_name]
+    model = joblib.load(model_row["path"])
+
+    split_path = model_dir / "train_calibration_test_split.csv"
+    df = pd.read_csv(analytic_path, dtype={"respondent_id": "string", "state_fips": "string"}, low_memory=False)
+    split_assignment = pd.read_csv(split_path, dtype={"respondent_id": "string"})
+    df = df.merge(split_assignment, on="respondent_id", validate="one_to_one")
+
+    X_test = df.loc[df["split"] == "test", M3_FEATURES]
+    reference_risk_scores = np.sort(model.predict_proba(X_test)[:, 1])
+    valid_categories = {col: sorted(df[col].dropna().unique().tolist()) for col in M3_FEATURES}
+
+    return model, reference_risk_scores, valid_categories
+
+
+def predict_respondents(model, valid_categories, reference_risk_scores, records):
+    """Scores one or more respondents (list of dicts, each with all M3_FEATURES keys) through an
+    already-loaded pipeline. Validates every value against `valid_categories` first and raises a
+    clear `ValueError` naming the bad field and its valid options -- `handle_unknown="ignore"` in
+    the underlying encoders would otherwise silently zero out a typo'd category rather than
+    erroring, which would mis-score a respondent without any indication something went wrong.
+    Returns predicted risk plus its percentile and approximate decile against
+    `reference_risk_scores` (Decile 1 = highest risk, matching the risk-decile table in
+    `5 Evaluation.ipynb`) -- a bare probability like "0.73" is hard to act on without knowing
+    where it sits relative to the population the model was evaluated against."""
+    input_df = pd.DataFrame(records)
+
+    missing_cols = set(M3_FEATURES) - set(input_df.columns)
+    if missing_cols:
+        raise ValueError(f"Missing required fields: {sorted(missing_cols)}")
+
+    for col in M3_FEATURES:
+        bad_values = set(input_df[col].unique()) - set(valid_categories[col])
+        if bad_values:
+            raise ValueError(
+                f"Invalid value(s) for '{col}': {sorted(bad_values)}. "
+                f"Valid options: {valid_categories[col]}"
+            )
+
+    input_df = input_df[M3_FEATURES]
+    risk = model.predict_proba(input_df)[:, 1]
+
+    percentile = np.searchsorted(reference_risk_scores, risk) / len(reference_risk_scores) * 100
+    decile = 10 - np.clip((percentile // 10).astype(int), 0, 9)
+
+    return pd.DataFrame({
+        "predicted_risk": risk.round(4),
+        "percentile_vs_test_set": percentile.round(1),
+        "approx_risk_decile": [f"Decile {d}" + (" (highest risk)" if d == 1 else "") for d in decile],
+    })
