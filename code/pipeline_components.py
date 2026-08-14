@@ -168,6 +168,42 @@ def build_ffnn_pipeline(features, hidden_layer_sizes=(64, 32), alpha=1e-4,
     ])
 
 
+def derive_two_stage_targets(df):
+    """Derives the two-stage follow-up targets (`never_screened`, `overdue_given_screened`) from
+    `crc_screening_status`. Defined once here rather than copy-pasted, since `3 Data Processing.ipynb`
+    (which first scoped these out) and `8 Two-Stage Model.ipynb` (which models them) both need the
+    identical derivation and previously each defined it inline -- a real risk if the recoding logic
+    ever needed to change, not just boilerplate. Neither target is persisted to a file (unlike the
+    train/calibration/test split), so every notebook that needs them calls this on the loaded
+    analytic dataset rather than reading a derived column from disk.
+
+    `never_screened`: 1 if the respondent has never had any recommended CRC test, defined for
+    every eligible respondent. `overdue_given_screened`: 1 if a respondent who has been screened
+    at least once is now overdue, 0 if up to date, NaN if never screened (only meaningful for the
+    subset who have ever been screened)."""
+    never_screened = (df["crc_screening_status"] == "Never screened").astype(int)
+    ever_screened_mask = df["crc_screening_status"].isin(["Up to date", "Overdue"])
+    overdue_given_screened = np.where(
+        ever_screened_mask, (df["crc_screening_status"] == "Overdue").astype(int), np.nan
+    )
+    return never_screened, overdue_given_screened, ever_screened_mask
+
+
+def extract_tuned_gb_params(gb_pipeline):
+    """Pulls the searched hyperparameters back out of an already-fitted, tuned gradient boosting
+    pipeline (e.g. the registered `gb_M3_tuned`), so a follow-up analysis can reuse the same tuned
+    architecture on different data/targets without re-running `RandomizedSearchCV`. Defined once
+    here rather than copy-pasted -- `7 Robustness Checks.ipynb` and `8 Two-Stage Model.ipynb` both
+    previously hardcoded the identical key-filter list separately, which would silently drift out
+    of sync if the search space in `4c` ever gained or renamed a parameter."""
+    tuned_param_names = [
+        "learning_rate", "max_iter", "max_leaf_nodes", "max_depth", "min_samples_leaf", "l2_regularization",
+    ]
+    return {
+        k: v for k, v in gb_pipeline.named_steps["model"].get_params().items() if k in tuned_param_names
+    }
+
+
 def compute_classification_metrics(y_true, y_proba, threshold=0.5):
     """AUROC/AUPRC/Precision/Sensitivity/Specificity/F1/Accuracy at the given threshold -- the
     standard set reported for every model (and every hyperparameter-search comparison) in
@@ -260,41 +296,26 @@ def make_model_registry(models_dir, manifest_path):
     return registry, register_model, load_registry
 
 
-def load_prediction_context(model_dir, analytic_path, model_name="gb_M3_tuned_calibrated"):
-    """Loads everything `predict_respondents` needs: the named model from the shared manifest,
-    the calibrated test-set risk distribution (for placing a new prediction's percentile/decile
-    in context), and the live set of valid category values per M3 predictor. Shared by
-    `9 Predict.ipynb` and `app.py` (the Streamlit webapp) so both stay in sync with one source of
-    truth rather than duplicating this logic."""
-    import joblib
-
-    manifest_path = model_dir / "model_registry_manifest.csv"
-    manifest = pd.read_csv(manifest_path)
-    model_row = manifest.set_index("name").loc[model_name]
-    model = joblib.load(model_row["path"])
-
-    split_path = model_dir / "train_calibration_test_split.csv"
-    df = pd.read_csv(analytic_path, dtype={"respondent_id": "string", "state_fips": "string"}, low_memory=False)
-    split_assignment = pd.read_csv(split_path, dtype={"respondent_id": "string"})
-    df = df.merge(split_assignment, on="respondent_id", validate="one_to_one")
-
-    X_test = df.loc[df["split"] == "test", M3_FEATURES]
-    reference_risk_scores = np.sort(model.predict_proba(X_test)[:, 1])
-    valid_categories = {col: sorted(df[col].dropna().unique().tolist()) for col in M3_FEATURES}
-
-    return model, reference_risk_scores, valid_categories
+# The five models shown in a cross-model comparison: the best-tuned representative of each of the
+# four families, plus the calibrated variant of the leading one -- not all 17 registered models,
+# which would mostly just repeat the M1/M2/M3 ablation story rather than compare families.
+COMPARISON_MODELS = ["logreg_M3", "rf_M3_tuned", "gb_M3_tuned", "gb_M3_tuned_calibrated", "ffnn_M3_tuned"]
+MODEL_DISPLAY_NAMES = {
+    "logreg_M3": "Logistic Regression",
+    "rf_M3_tuned": "Random Forest (tuned)",
+    "gb_M3_tuned": "Gradient Boosting (tuned, raw)",
+    "gb_M3_tuned_calibrated": "Gradient Boosting (tuned, calibrated) -- official model",
+    "ffnn_M3_tuned": "Feedforward Neural Network (tuned)",
+}
 
 
-def predict_respondents(model, valid_categories, reference_risk_scores, records):
-    """Scores one or more respondents (list of dicts, each with all M3_FEATURES keys) through an
-    already-loaded pipeline. Validates every value against `valid_categories` first and raises a
-    clear `ValueError` naming the bad field and its valid options -- `handle_unknown="ignore"` in
-    the underlying encoders would otherwise silently zero out a typo'd category rather than
-    erroring, which would mis-score a respondent without any indication something went wrong.
-    Returns predicted risk plus its percentile and approximate decile against
-    `reference_risk_scores` (Decile 1 = highest risk, matching the risk-decile table in
-    `5 Evaluation.ipynb`) -- a bare probability like "0.73" is hard to act on without knowing
-    where it sits relative to the population the model was evaluated against."""
+def _validate_respondent_input(valid_categories, records):
+    """Shared validation used by both `predict_respondents` and `predict_across_models`: every
+    M3 predictor present, every value one of the field's known categories. Raises a clear
+    `ValueError` naming the bad field and its valid options -- `handle_unknown="ignore"` in the
+    underlying encoders would otherwise silently zero out a typo'd category rather than erroring,
+    which would mis-score a respondent without any indication something went wrong. Returns the
+    input as a DataFrame with columns in the fixed M3_FEATURES order the fitted pipelines expect."""
     input_df = pd.DataFrame(records)
 
     missing_cols = set(M3_FEATURES) - set(input_df.columns)
@@ -309,7 +330,39 @@ def predict_respondents(model, valid_categories, reference_risk_scores, records)
                 f"Valid options: {valid_categories[col]}"
             )
 
-    input_df = input_df[M3_FEATURES]
+    return input_df[M3_FEATURES]
+
+
+def load_prediction_context(model_dir, analytic_path, model_name="gb_M3_tuned_calibrated"):
+    """Loads everything `predict_respondents`/`predict_across_models` need: every model in the
+    shared manifest (so a cross-model comparison never needs a second load), the named model's
+    calibrated test-set risk distribution (for placing a new prediction's percentile/decile in
+    context), and the live set of valid category values per M3 predictor. Shared by
+    `9 Predict.ipynb` and `app.py` (the Streamlit webapp) so both stay in sync with one source of
+    truth rather than duplicating this logic."""
+    _, _, load_registry = make_model_registry(model_dir / "models", model_dir / "model_registry_manifest.csv")
+    model_registry = load_registry()
+    model = model_registry[model_name]["pipeline"]
+
+    split_path = model_dir / "train_calibration_test_split.csv"
+    df = pd.read_csv(analytic_path, dtype={"respondent_id": "string", "state_fips": "string"}, low_memory=False)
+    split_assignment = pd.read_csv(split_path, dtype={"respondent_id": "string"})
+    df = df.merge(split_assignment, on="respondent_id", validate="one_to_one")
+
+    X_test = df.loc[df["split"] == "test", M3_FEATURES]
+    reference_risk_scores = np.sort(model.predict_proba(X_test)[:, 1])
+    valid_categories = {col: sorted(df[col].dropna().unique().tolist()) for col in M3_FEATURES}
+
+    return model, reference_risk_scores, valid_categories, model_registry
+
+
+def predict_respondents(model, valid_categories, reference_risk_scores, records):
+    """Scores one or more respondents (list of dicts, each with all M3_FEATURES keys) through an
+    already-loaded pipeline. Returns predicted risk plus its percentile and approximate decile
+    against `reference_risk_scores` (Decile 1 = highest risk, matching the risk-decile table in
+    `5 Evaluation.ipynb`) -- a bare probability like "0.73" is hard to act on without knowing
+    where it sits relative to the population the model was evaluated against."""
+    input_df = _validate_respondent_input(valid_categories, records)
     risk = model.predict_proba(input_df)[:, 1]
 
     percentile = np.searchsorted(reference_risk_scores, risk) / len(reference_risk_scores) * 100
@@ -320,3 +373,31 @@ def predict_respondents(model, valid_categories, reference_risk_scores, records)
         "percentile_vs_test_set": percentile.round(1),
         "approx_risk_decile": [f"Decile {d}" + (" (highest risk)" if d == 1 else "") for d in decile],
     })
+
+
+def predict_across_models(model_registry, valid_categories, records, model_names=None):
+    """Scores the same respondent(s) through several registered models at once, for a
+    side-by-side comparison of how different model families rate the same input -- e.g. to see
+    whether the official calibrated gradient boosting model's risk estimate is an outlier or
+    broadly agrees with logistic regression, random forest, and the neural network. Returns a
+    long-format DataFrame (one row per respondent-model pair) rather than one row per respondent,
+    since the number of models being compared can vary and a wide format would need a column per
+    model name. `model_names` defaults to `COMPARISON_MODELS`; any name not present in
+    `model_registry` is silently skipped rather than raising, so this stays usable even if the
+    registry doesn't have every comparison model registered."""
+    model_names = model_names or COMPARISON_MODELS
+    input_df = _validate_respondent_input(valid_categories, records)
+
+    rows = []
+    for name in model_names:
+        if name not in model_registry:
+            continue
+        proba = model_registry[name]["pipeline"].predict_proba(input_df)[:, 1]
+        for i, risk in enumerate(proba):
+            rows.append({
+                "respondent_index": i,
+                "model": name,
+                "model_label": MODEL_DISPLAY_NAMES.get(name, name),
+                "predicted_risk": round(float(risk), 4),
+            })
+    return pd.DataFrame(rows)

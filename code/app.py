@@ -2,9 +2,9 @@
 
 Project: Predicting colorectal cancer screening non-compliance to guide targeted outreach.
 Uses the project's official model (`gb_M3_tuned_calibrated`, gradient boosting, tuned,
-isotonic-calibrated in `5 Evaluation.ipynb`) via the same `predict_respondents()` function used in
-`9 Predict.ipynb` -- both import from `pipeline_components.py`, so the notebook and this app can
-never drift out of sync with each other.
+isotonic-calibrated in `5 Evaluation.ipynb`) via the same `predict_respondents()`/
+`predict_across_models()` functions used in `9 Predict.ipynb` -- both import from
+`pipeline_components.py`, so the notebook and this app can never drift out of sync with each other.
 
 Run with:
     pip install streamlit
@@ -19,7 +19,8 @@ import streamlit as st
 
 from pipeline_components import (
     M1_FEATURES, M2_FEATURES, M3_FEATURES, ORDINAL_FEATURES,
-    load_prediction_context, predict_respondents,
+    load_prediction_context, predict_respondents, predict_across_models,
+    COMPARISON_MODELS, MODEL_DISPLAY_NAMES,
 )
 
 DATA_DIR = Path(__file__).parent / ".." / "data"
@@ -62,6 +63,16 @@ ORDINAL_ORDER_HINT = {
     "general_health": ["Poor", "Fair", "Good", "Very good", "Excellent", "Not reported"],
 }
 
+# Shortened labels for the comparison chart/table -- MODEL_DISPLAY_NAMES' full names are a bit
+# long for a bar chart's y-axis.
+COMPARISON_SHORT_LABELS = {
+    "logreg_M3": "Logistic Regression",
+    "rf_M3_tuned": "Random Forest",
+    "gb_M3_tuned": "Gradient Boosting (raw)",
+    "gb_M3_tuned_calibrated": "Gradient Boosting (calibrated, official)",
+    "ffnn_M3_tuned": "Neural Network",
+}
+
 
 @st.cache_resource
 def get_prediction_context():
@@ -76,8 +87,8 @@ st.caption(
     "the true observed rate, not just a ranking score."
 )
 
-with st.spinner("Loading model..."):
-    model, reference_risk_scores, valid_categories = get_prediction_context()
+with st.spinner("Loading models..."):
+    model, reference_risk_scores, valid_categories, model_registry = get_prediction_context()
 
 st.markdown("### Respondent details")
 
@@ -131,14 +142,48 @@ if st.button("Predict risk", type="primary"):
                 "project's risk-decile analysis (`5 Evaluation.ipynb`) found captures roughly "
                 "28% of all non-compliant adults at 10% outreach capacity."
             )
+
+        st.markdown("### Model comparison")
+        st.caption(
+            "How much do the different model families agree on this respondent? Only the "
+            "official model (calibrated) has been corrected so its percentage reflects the true "
+            "observed rate -- the other four were all trained with the same class-weighting that "
+            "pushes raw probabilities above the true rate (see `5 Evaluation.ipynb`'s calibration "
+            "section), so they're useful for checking *ranking* agreement, not for taking their "
+            "percentages at face value."
+        )
+
+        comparison = predict_across_models(model_registry, valid_categories, [responses])
+        comparison["short_label"] = comparison["model"].map(COMPARISON_SHORT_LABELS)
+        comparison = comparison.sort_values("predicted_risk")
+
+        fig2, ax2 = plt.subplots(figsize=(7, 3.5))
+        bar_colors = [
+            "#C44E52" if name == MODEL_NAME else "#4C72B0" for name in comparison["model"]
+        ]
+        ax2.barh(comparison["short_label"], comparison["predicted_risk"], color=bar_colors)
+        for y, (_, row) in enumerate(comparison.iterrows()):
+            ax2.text(row["predicted_risk"] + 0.01, y, f"{row['predicted_risk']:.1%}", va="center", fontsize=9)
+        ax2.set_xlabel("Predicted non-compliance risk")
+        ax2.set_xlim(0, 1.08)
+        plt.tight_layout()
+        st.pyplot(fig2)
+
+        st.dataframe(
+            comparison[["short_label", "predicted_risk"]]
+            .rename(columns={"short_label": "Model", "predicted_risk": "Predicted risk"})
+            .assign(**{"Predicted risk": lambda d: d["Predicted risk"].map("{:.1%}".format)})
+            .set_index("Model"),
+            width="stretch",
+        )
     except ValueError as e:
         st.error(str(e))
 
 st.markdown("---")
 st.caption(
-    "Model: gradient boosting (tuned), isotonic-calibrated on a held-out calibration split. "
-    "Trained and evaluated on 2024 BRFSS data for US adults aged 45-75. Predictions are for "
-    "prediction/targeting purposes, not a clinical diagnosis or a causal risk estimate -- see the "
-    "project proposal's Risks and Mitigations section for caveats (self-reported screening status, "
-    "US-to-Singapore transferability, unweighted analysis)."
+    "Official model: gradient boosting (tuned), isotonic-calibrated on a held-out calibration "
+    "split. Trained and evaluated on 2024 BRFSS data for US adults aged 45-75. Predictions are "
+    "for prediction/targeting purposes, not a clinical diagnosis or a causal risk estimate -- see "
+    "the project proposal's Risks and Mitigations section for caveats (self-reported screening "
+    "status, US-to-Singapore transferability, unweighted analysis)."
 )
